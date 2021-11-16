@@ -1,0 +1,29 @@
+version: '3.7'
+
+services:  
+  # independent service
+  apache-webserver:
+    restart: always
+    container_name: apache-webserver
+    hostname: apache-webserver
+    build:
+        dockerfile: ./Dockerfile.engine
+        context: .
+    image: httpd:2.4
+    volumes: 
+      - "./src/main/resources/static/:/usr/local/apache2/htdocs/"
+    #   - "./ssl/:/usr/local/apache2/conf/" --Backup plan
+    ports: 
+      - "8080:80"
+      - "8443:443"
+
+  qr-backend:
+    restart: always
+    container_name: qr-backend
+    hostname: qr-backend
+    image: openjdk:8-jdk-alpine
+    volumes: 
+      - "./:/app/"
+    ports: 
+      - "8081:8080"
+    command: sh -c "cd /app/ && ./mvnw spring-boot:run"

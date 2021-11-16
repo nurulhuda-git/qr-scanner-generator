@@ -1,0 +1,261 @@
+<style>
+    .button-group,
+    .play-area {
+        border: 1px solid grey;
+        padding: 1em 1%;
+        margin-bottom: 1em;
+    }
+
+    .button {
+        padding: 0.5em;
+        margin-right: 1em;
+    }
+
+    .play-area-sub {
+        width: 100%;
+        padding: 1em 1%;
+        display: inline-block;
+        text-align: center;
+    }
+
+    #capture {
+        display: none;
+    }
+
+    #snapshot {
+        display: inline-block;
+        width: 640px;
+        height: 480px;
+    }
+
+    /* The Modal (background) */
+    .modal {
+        display: none;
+        /* Hidden by default */
+        position: fixed;
+        /* Stay in place */
+        z-index: 1;
+        /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%;
+        /* Full width */
+        height: 100%;
+        /* Full height */
+        overflow: auto;
+        /* Enable scroll if needed */
+        background-color: rgb(0, 0, 0);
+        /* Fallback color */
+        background-color: rgba(0, 0, 0, 0.4);
+        /* Black w/ opacity */
+    }
+
+    /* Modal Content/Box */
+    .modal-content {
+        background-color: #fefefe;
+        margin: 15% auto;
+        /* 15% from the top and centered */
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        /* Could be more or less, depending on screen size */
+    }
+
+    /* The Close Button */
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+
+    .close:hover,
+    .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+</style>
+
+<body>
+    <!-- The buttons to control the stream -->
+    <div class="button-group">
+        <button id="btn-start" type="button" class="button">Start Streaming</button>
+        <button id="btn-stop" type="button" class="button">Stop Streaming</button>
+        <button id="btn-capture" type="button" class="button">Capture Image</button>
+        <button id="btn-upload" type="button" class="button">Upload Image</button>
+    </div>
+
+    <!-- Video Element & Canvas -->
+    <div class="play-area">
+        <div class="play-area-sub">
+            <h3>The Stream</h3>
+            <video id="stream" width="320" height="240"></video>
+        </div>
+        <!-- <div class="play-area-sub">
+            <h3>The Capture</h3>
+            <canvas id="capture" width="640" height="480"></canvas>
+            <div id="snapshot"></div>
+        </div> -->
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+
+        <!-- Modal content -->
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>The Capture</h3>
+            <canvas id="capture" width="640" height="480"></canvas>
+            <div id="snapshot"></div>
+        </div>
+    </div>
+</body>
+
+<script type="text/javascript">
+
+    // Custom resolution
+    const imageWidth = 640;
+    const imageHeight = 480;
+
+    // The buttons to start & stop stream and to capture the image
+    var btnStart = document.getElementById("btn-start");
+    var btnStop = document.getElementById("btn-stop");
+    var btnCapture = document.getElementById("btn-capture");
+    var btnUpload = document.getElementById("btn-upload");
+
+    // The stream & capture
+    var stream = document.getElementById("stream");
+    var capture = document.getElementById("capture");
+    var snapshot = document.getElementById("snapshot");
+
+    // The video stream
+    var cameraStream = null;
+
+    // Attach listeners
+    btnStart.addEventListener("click", startStreaming);
+    btnStop.addEventListener("click", stopStreaming);
+    btnCapture.addEventListener("click", captureSnapshot);
+    btnUpload.addEventListener("click", uploadImage);
+
+    // Start Streaming
+    function startStreaming() {
+
+        var mediaSupport = 'mediaDevices' in navigator;
+
+        if (mediaSupport && null == cameraStream) {
+
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function (mediaStream) {
+
+                    cameraStream = mediaStream;
+
+                    stream.srcObject = mediaStream;
+
+                    stream.play();
+                })
+                .catch(function (err) {
+
+                    console.log("Unable to access camera: " + err);
+                });
+        }
+        else {
+
+            alert('Your browser does not support media devices.');
+
+            return;
+        }
+    }
+
+    // Stop Streaming
+    function stopStreaming() {
+
+        if (null != cameraStream) {
+
+            var track = cameraStream.getTracks()[0];
+
+            track.stop();
+            stream.load();
+
+            cameraStream = null;
+        }
+    }
+
+    function captureSnapshot() {
+
+        if (null != cameraStream) {
+
+            var ctx = capture.getContext('2d');
+            var img = new Image();
+
+            // ctx.drawImage(stream, 0, 0, capture.width, capture.height);
+            ctx.drawImage(stream, 0, 0, imageWidth, imageHeight);
+
+            img.src = capture.toDataURL("image/png");
+            // img.width = 240;
+            img.width = imageWidth;
+
+            snapshot.innerHTML = '';
+
+            snapshot.appendChild(img);
+        }
+    }
+
+    function dataURItoBlob(dataURI) {
+
+        var byteString = atob(dataURI.split(',')[1]);
+        var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+
+        var buffer = new ArrayBuffer(byteString.length);
+        var data = new DataView(buffer);
+
+        for (var i = 0; i < byteString.length; i++) {
+
+            data.setUint8(i, byteString.charCodeAt(i));
+        }
+
+        return new Blob([buffer], { type: mimeString });
+    }
+
+    function uploadImage() {
+        var request = new XMLHttpRequest();
+
+        request.open("POST", "https://192.168.1.8:8081/upload", true);
+
+        var data = new FormData();
+        var dataURI = snapshot.firstChild.getAttribute("src");
+        var imageData = dataURItoBlob(dataURI);
+
+        data.append("file", imageData, "myimage.png");
+
+        request.send(data);
+    }
+</script>
+
+<script type="text/javascript">
+    // Get the modal
+    var modal = document.getElementById("myModal");
+
+    // Get the button that opens the modal
+    var btn = document.getElementById("btn-capture");
+
+    // Get the <span> element that closes the modal
+    var span = document.getElementsByClassName("close")[0];
+
+    // When the user clicks on the button, open the modal
+    btn.onclick = function () {
+        modal.style.display = "block";
+    }
+
+    // When the user clicks on <span> (x), close the modal
+    span.onclick = function () {
+        modal.style.display = "none";
+    }
+
+    // When the user clicks anywhere outside of the modal, close it
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+</script>
